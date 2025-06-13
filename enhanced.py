@@ -270,9 +270,9 @@ if uploaded_file is not None:
         return Image.fromarray(img_array.astype(np.uint8))
     
     def create_enhanced_pixel_art(img, target_width, target_height, display_width, display_height, 
-                                enhance_contrast, enhance_colors, sharpen_pre, color_quantization, 
-                                num_colors, edge_preserve, show_grid=False, pixel_size=1):
-        """Create enhanced pixel art with advanced quality processing"""
+                                enhance_contrast, enhance_colors, sharpen_pre, num_colors, 
+                                color_method, edge_preserve, show_grid=False, pixel_size=1):
+        """Create enhanced pixel art with advanced quality processing and limited colors"""
         
         # Step 1: Enhance the original image
         enhanced_img = enhance_image_quality(img, enhance_contrast, enhance_colors, sharpen_pre)
@@ -280,9 +280,8 @@ if uploaded_file is not None:
         # Step 2: Smart resize to pixel art dimensions
         pixel_art = smart_resize_with_edge_preservation(enhanced_img, target_width, target_height, edge_preserve)
         
-        # Step 3: Apply color quantization if enabled
-        if color_quantization:
-            pixel_art = quantize_colors(pixel_art, num_colors)
+        # Step 3: Apply advanced color quantization (always applied for minimal colors)
+        pixel_art = quantize_colors_advanced(pixel_art, num_colors, color_method)
         
         # Step 4: Scale up to display size using nearest neighbor for crisp pixels
         if display_width != target_width or display_height != target_height:
@@ -300,8 +299,8 @@ if uploaded_file is not None:
     show_grid = 'show_pixel_grid' in locals() and show_pixel_grid if mode == "Advanced Mode" else False
     pixel_art, display_img = create_enhanced_pixel_art(
         image, pixel_width, pixel_height, display_width, display_height,
-        enhance_contrast, enhance_colors, sharpen_pre, color_quantization,
-        num_colors if color_quantization else 256, edge_preserve, show_grid,
+        enhance_contrast, enhance_colors, sharpen_pre, num_colors,
+        color_method, edge_preserve, show_grid,
         pixel_size if mode == "Advanced Mode" else 6
     )
     
@@ -318,15 +317,36 @@ if uploaded_file is not None:
     if st.checkbox("🔍 Show Quality Comparison", value=False):
         st.subheader("Quality Comparison")
         
-        # Create a basic version for comparison
+        # Create a basic version for comparison (with full colors)
         basic_pixel_art = image.resize((pixel_width, pixel_height), Image.Resampling.LANCZOS)
         basic_display = basic_pixel_art.resize((display_width, display_height), Image.Resampling.NEAREST)
         
         col_comp1, col_comp2 = st.columns(2)
         with col_comp1:
-            st.image(basic_display, caption="Basic Pixelation", use_container_width=True)
+            st.image(basic_display, caption="Basic Pixelation (Full Colors)", use_container_width=True)
         with col_comp2:
-            st.image(display_img, caption="Enhanced Pixelation", use_container_width=True)
+            st.image(display_img, caption=f"Enhanced Pixelation ({num_colors} Colors)", use_container_width=True)
+    
+    # Show color palette
+    if st.checkbox("🎨 Show Color Palette", value=True):
+        st.subheader("Extracted Color Palette")
+        
+        # Extract and display the actual colors used
+        if color_method == "Dominant Colors":
+            palette = extract_dominant_colors(pixel_art, num_colors)
+            
+            # Create a color palette visualization
+            palette_img = np.zeros((50, num_colors * 50, 3), dtype=np.uint8)
+            for i, color in enumerate(palette):
+                palette_img[:, i*50:(i+1)*50] = color
+            
+            st.image(palette_img, caption=f"Your {num_colors}-Color Palette", width=num_colors * 50)
+            
+            # Show RGB values
+            color_info = []
+            for i, color in enumerate(palette):
+                color_info.append(f"Color {i+1}: RGB({color[0]}, {color[1]}, {color[2]})")
+            st.text("\n".join(color_info))
     
     # Download options
     st.subheader("💾 Download Options")
@@ -391,10 +411,7 @@ if uploaded_file is not None:
         reduction_factor = (orig_width * orig_height) / (pixel_width * pixel_height)
         st.metric("Size Reduction", f"{reduction_factor:.1f}x")
     with col_s4:
-        if color_quantization:
-            st.metric("Color Palette", f"{num_colors} colors")
-        else:
-            st.metric("Colors", "Full spectrum")
+        st.metric("Color Palette", f"{num_colors} colors")
 
 else:
     st.info("⬆️ Please upload an image to start creating enhanced pixel art!")

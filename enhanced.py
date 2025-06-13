@@ -7,7 +7,7 @@ from io import BytesIO
 st.set_page_config(page_title="Enhanced Pixel Art Generator", layout="wide")
 
 # App title
-st.title("Pixel Art Generator")
+st.title("🎨 Enhanced Pixel Art Generator")
 st.markdown("Create **ultra-crisp**, high-quality pixel art with advanced processing!")
 
 # Image uploader
@@ -32,22 +32,34 @@ if uploaded_file is not None:
     orig_width, orig_height = image.size
     
     # Enhanced pixelation parameters
-    st.subheader("Pixelation Controls")
+    st.subheader("🎛️ Enhanced Pixelation Controls")
     
     # Quality enhancement options
-    with st.expander("Quality Enhancement Options", expanded=True):
+    with st.expander("🚀 Quality Enhancement Options", expanded=True):
         col_q1, col_q2 = st.columns(2)
         
         with col_q1:
-            enhance_contrast = st.checkbox("Enhance Contrast", value=True, help="Increases contrast for better pixel definition")
-            enhance_colors = st.checkbox("Color Enhancement", value=True, help="Boosts color saturation for vibrant pixels")
-            sharpen_pre = st.checkbox("Pre-sharpen", value=False, help="Sharpens image before pixelation")
+            enhance_contrast = st.checkbox("📈 Enhance Contrast", value=True, help="Increases contrast for better pixel definition")
+            enhance_colors = st.checkbox("🌈 Color Enhancement", value=True, help="Boosts color saturation for vibrant pixels")
+            sharpen_pre = st.checkbox("🔍 Pre-sharpen", value=False, help="Sharpens image before pixelation")
         
         with col_q2:
-            color_quantization = st.checkbox("Color Quantization", value=True, help="Reduces colors for authentic pixel art look")
-            if color_quantization:
-                num_colors = st.slider("Color Palette Size", min_value=8, max_value=256, value=64, step=8)
-            edge_preserve = st.checkbox("Edge Preservation", value=True, help="Better preserves important edges")
+            # Simplified color control - focus on minimal colors
+            st.markdown("**🎨 Color Palette:**")
+            num_colors = st.selectbox(
+                "Number of Colors",
+                [2, 3, 4, 5, 6],
+                index=2,  # Default to 4 colors
+                help="Maximum colors in your pixel art (fewer = more stylized)"
+            )
+            
+            color_method = st.selectbox(
+                "Color Selection Method",
+                ["Dominant Colors", "K-Means Clustering", "Uniform Quantization"],
+                help="How to choose the limited color palette"
+            )
+            
+            edge_preserve = st.checkbox("📐 Edge Preservation", value=True, help="Better preserves important edges")
     
     # Two modes: Simple and Advanced
     mode = st.radio("Choose control mode:", ["Simple Mode", "Advanced Mode"], horizontal=True)
@@ -116,7 +128,7 @@ if uploaded_file is not None:
             show_pixel_grid = st.checkbox("Show Pixel Grid", value=False, help="Adds grid lines between pixels")
     
     # Show current settings
-    st.info(f"Pixel Art: {pixel_width}×{pixel_height} pixels | Display: {display_width}×{display_height} pixels")
+    st.info(f"🎯 Pixel Art: {pixel_width}×{pixel_height} pixels | Display: {display_width}×{display_height} pixels")
     
     # Enhanced pixelation function
     def enhance_image_quality(img, enhance_contrast, enhance_colors, sharpen_pre):
@@ -139,12 +151,75 @@ if uploaded_file is not None:
         
         return enhanced_img
     
-    def quantize_colors(img, num_colors):
-        """Reduce the number of colors in the image for authentic pixel art look"""
-        # Convert to P mode with specified number of colors
-        quantized = img.quantize(colors=num_colors, method=Image.Quantize.MEDIANCUT)
-        # Convert back to RGB
-        return quantized.convert('RGB')
+    def extract_dominant_colors(img, num_colors):
+        """Extract dominant colors using K-means clustering"""
+        # Convert PIL image to numpy array
+        img_array = np.array(img)
+        pixels = img_array.reshape((-1, 3))
+        
+        # Simple K-means clustering implementation
+        from random import sample
+        
+        # Initialize centroids randomly
+        centroids = np.array(sample(pixels.tolist(), num_colors))
+        
+        for _ in range(20):  # Max iterations
+            # Assign each pixel to nearest centroid
+            distances = np.sqrt(((pixels - centroids[:, np.newaxis])**2).sum(axis=2))
+            closest_centroid = np.argmin(distances, axis=0)
+            
+            # Update centroids
+            new_centroids = []
+            for i in range(num_colors):
+                if np.sum(closest_centroid == i) > 0:
+                    new_centroids.append(pixels[closest_centroid == i].mean(axis=0))
+                else:
+                    new_centroids.append(centroids[i])
+            
+            new_centroids = np.array(new_centroids)
+            
+            # Check for convergence
+            if np.allclose(centroids, new_centroids):
+                break
+            centroids = new_centroids
+        
+        return centroids.astype(int)
+    
+    def quantize_colors_advanced(img, num_colors, method="Dominant Colors"):
+        """Advanced color quantization with multiple methods"""
+        
+        if method == "Dominant Colors":
+            # Extract dominant colors using custom K-means
+            palette = extract_dominant_colors(img, num_colors)
+            
+            # Map each pixel to closest palette color
+            img_array = np.array(img)
+            original_shape = img_array.shape
+            pixels = img_array.reshape((-1, 3))
+            
+            # Find closest palette color for each pixel
+            quantized_pixels = []
+            for pixel in pixels:
+                distances = np.sqrt(((palette - pixel)**2).sum(axis=1))
+                closest_color_idx = np.argmin(distances)
+                quantized_pixels.append(palette[closest_color_idx])
+            
+            quantized_array = np.array(quantized_pixels).reshape(original_shape)
+            return Image.fromarray(quantized_array.astype(np.uint8))
+            
+        elif method == "K-Means Clustering":
+            # Use PIL's built-in quantization with fewer colors
+            quantized = img.quantize(colors=num_colors, method=Image.Quantize.MEDIANCUT)
+            return quantized.convert('RGB')
+            
+        else:  # Uniform Quantization
+            # Reduce color depth uniformly
+            img_array = np.array(img)
+            # Reduce each channel to fewer levels
+            levels = num_colors if num_colors <= 8 else 8
+            factor = 256 // levels
+            quantized_array = (img_array // factor) * factor
+            return Image.fromarray(quantized_array.astype(np.uint8))
     
     def smart_resize_with_edge_preservation(img, target_width, target_height, preserve_edges=True):
         """Advanced resizing with edge preservation"""
@@ -240,7 +315,7 @@ if uploaded_file is not None:
         )
     
     # Quality comparison
-    if st.checkbox("Show Quality Comparison", value=False):
+    if st.checkbox("🔍 Show Quality Comparison", value=False):
         st.subheader("Quality Comparison")
         
         # Create a basic version for comparison
@@ -254,7 +329,7 @@ if uploaded_file is not None:
             st.image(display_img, caption="Enhanced Pixelation", use_container_width=True)
     
     # Download options
-    st.subheader("Download Options")
+    st.subheader("💾 Download Options")
     
     col_d1, col_d2, col_d3 = st.columns(3)
     
@@ -265,7 +340,7 @@ if uploaded_file is not None:
         byte_original = buf_original.getvalue()
         
         st.download_button(
-            label=f"Pixel Art ({pixel_width}×{pixel_height})",
+            label=f"📱 Pixel Art ({pixel_width}×{pixel_height})",
             data=byte_original,
             file_name=f"enhanced_pixel_art_{pixel_width}x{pixel_height}.png",
             mime="image/png",
@@ -279,7 +354,7 @@ if uploaded_file is not None:
         byte_display = buf_display.getvalue()
         
         st.download_button(
-            label=f"Display Version ({display_width}×{display_height})",
+            label=f"🖼️ Display Version ({display_width}×{display_height})",
             data=byte_display,
             file_name=f"enhanced_display_{display_width}x{display_height}.png",
             mime="image/png",
@@ -297,7 +372,7 @@ if uploaded_file is not None:
         byte_uhq = buf_uhq.getvalue()
         
         st.download_button(
-            label=f"Ultra-HQ ({uhq_width}×{uhq_height})",
+            label=f"⭐ Ultra-HQ ({uhq_width}×{uhq_height})",
             data=byte_uhq,
             file_name=f"ultra_hq_pixel_art_{uhq_width}x{uhq_height}.png",
             mime="image/png",
@@ -305,7 +380,7 @@ if uploaded_file is not None:
         )
     
     # Show enhanced stats
-    st.subheader("Enhanced Statistics")
+    st.subheader("📊 Enhanced Statistics")
     col_s1, col_s2, col_s3, col_s4 = st.columns(4)
     
     with col_s1:
@@ -322,16 +397,16 @@ if uploaded_file is not None:
             st.metric("Colors", "Full spectrum")
 
 else:
-    st.info("Please upload an image to start creating enhanced pixel art!")
+    st.info("⬆️ Please upload an image to start creating enhanced pixel art!")
     
     # Show enhanced features
-    st.subheader("Enhanced Features:")
+    st.subheader("🚀 Enhanced Features:")
     
     col_f1, col_f2 = st.columns(2)
     
     with col_f1:
         st.markdown("""
-        **Quality Enhancements:**
+        **🎨 Quality Enhancements:**
         - Advanced contrast enhancement
         - Color saturation boosting
         - Pre-processing sharpening
@@ -341,7 +416,7 @@ else:
     
     with col_f2:
         st.markdown("""
-        **Advanced Processing:**
+        **📐 Advanced Processing:**
         - Multi-step resize algorithm
         - Optimal resampling selection
         - Pixel grid overlay option

@@ -72,8 +72,8 @@ if uploaded_file is not None:
         )
         
         if preset == "Custom":
-            pixel_width = st.slider("Pixel Art Width", min_value=8, max_value=512, value=90, step=2)
-            pixel_height = st.slider("Pixel Art Height", min_value=8, max_value=512, value=120, step=2)
+            pixel_width = st.slider("Pixel Art Width", min_value=8, max_value=1300, value=90, step=2)
+            pixel_height = st.slider("Pixel Art Height", min_value=8, max_value=1300, value=120, step=2)
         else:
             size_map = {
                 "Game Sprite (16×16)": (16, 16),

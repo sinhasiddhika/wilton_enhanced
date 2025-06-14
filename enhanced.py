@@ -97,7 +97,7 @@ if uploaded_file is not None:
             pixel_width = st.number_input(
                 "Pixel Art Width (in pixels)",
                 min_value=8,
-                max_value=512,
+                max_value=1300,
                 value=90,
                 step=2,
                 help="This is the actual pixel count in your pixel art"
@@ -105,7 +105,7 @@ if uploaded_file is not None:
             pixel_height = st.number_input(
                 "Pixel Art Height (in pixels)",
                 min_value=8,
-                max_value=512,
+                max_value=1300,
                 value=120,
                 step=2,
                 help="This is the actual pixel count in your pixel art"

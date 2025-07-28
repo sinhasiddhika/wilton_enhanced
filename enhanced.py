@@ -48,7 +48,7 @@ if uploaded_file is not None:
             st.markdown("**🎨 Color Palette:**")
             num_colors = st.selectbox(
                 "Number of Colors",
-                [2, 3, 4, 5, 6],
+                [2, 3, 4, 5, 6, 8, 10, 12, 16, 20], # CHANGED: Increased the number of color options up to 20
                 index=2,  # Default to 4 colors
                 help="Maximum colors in your pixel art (fewer = more stylized)"
             )
@@ -160,6 +160,11 @@ if uploaded_file is not None:
         # Simple K-means clustering implementation
         from random import sample
         
+        # Handle case where image has fewer unique colors than requested
+        unique_pixels = np.unique(pixels, axis=0)
+        if len(unique_pixels) < num_colors:
+            return unique_pixels.astype(int)
+
         # Initialize centroids randomly
         centroids = np.array(sample(pixels.tolist(), num_colors))
         
@@ -216,9 +221,10 @@ if uploaded_file is not None:
             # Reduce color depth uniformly
             img_array = np.array(img)
             # Reduce each channel to fewer levels
-            levels = num_colors if num_colors <= 8 else 8
+            levels = int(round(num_colors**(1/3))) # approx levels per channel
+            if levels < 1: levels = 1
             factor = 256 // levels
-            quantized_array = (img_array // factor) * factor
+            quantized_array = (img_array // factor) * factor + (factor // 2) # Center the color
             return Image.fromarray(quantized_array.astype(np.uint8))
     
     def smart_resize_with_edge_preservation(img, target_width, target_height, preserve_edges=True):
@@ -290,13 +296,13 @@ if uploaded_file is not None:
             display_img = pixel_art.copy()
         
         # Step 5: Add pixel grid if requested
-        if show_grid and 'show_pixel_grid' in locals() and show_pixel_grid:
+        if show_grid and mode == "Advanced Mode":
             display_img = add_pixel_grid(display_img, pixel_size)
         
         return pixel_art, display_img
     
     # Generate the enhanced pixel art
-    show_grid = 'show_pixel_grid' in locals() and show_pixel_grid if mode == "Advanced Mode" else False
+    show_grid = show_pixel_grid if mode == "Advanced Mode" else False
     pixel_art, display_img = create_enhanced_pixel_art(
         image, pixel_width, pixel_height, display_width, display_height,
         enhance_contrast, enhance_colors, sharpen_pre, num_colors,
@@ -310,7 +316,7 @@ if uploaded_file is not None:
         st.image(
             display_img, 
             caption=f"Pixel Art: {pixel_width}×{pixel_height} | Display: {display_width}×{display_height}",
-            use_container_width=False
+            use_container_width=True # Changed for better responsive layout
         )
     
     # Quality comparison
@@ -332,22 +338,25 @@ if uploaded_file is not None:
         st.subheader("Extracted Color Palette")
         
         # Extract and display the actual colors used
-        if color_method == "Dominant Colors":
+        try:
             palette = extract_dominant_colors(pixel_art, num_colors)
-            
+            actual_num_colors = len(palette)
+
             # Create a color palette visualization
-            palette_img = np.zeros((50, num_colors * 50, 3), dtype=np.uint8)
+            palette_img = np.zeros((50, actual_num_colors * 50, 3), dtype=np.uint8)
             for i, color in enumerate(palette):
                 palette_img[:, i*50:(i+1)*50] = color
             
-            st.image(palette_img, caption=f"Your {num_colors}-Color Palette", width=num_colors * 50)
+            st.image(palette_img, caption=f"Your {actual_num_colors}-Color Palette", width=actual_num_colors * 50 if actual_num_colors > 0 else 50)
             
             # Show RGB values
             color_info = []
             for i, color in enumerate(palette):
                 color_info.append(f"Color {i+1}: RGB({color[0]}, {color[1]}, {color[2]})")
             st.text("\n".join(color_info))
-    
+        except Exception as e:
+            st.error(f"Could not generate color palette. Error: {e}")
+
     # Download options
     st.subheader("💾 Download Options")
     
@@ -408,7 +417,7 @@ if uploaded_file is not None:
     with col_s2:
         st.metric("Pixel Art Size", f"{pixel_width}×{pixel_height}")
     with col_s3:
-        reduction_factor = (orig_width * orig_height) / (pixel_width * pixel_height)
+        reduction_factor = (orig_width * orig_height) / (pixel_width * pixel_height) if (pixel_width * pixel_height) > 0 else 0
         st.metric("Size Reduction", f"{reduction_factor:.1f}x")
     with col_s4:
         st.metric("Color Palette", f"{num_colors} colors")
